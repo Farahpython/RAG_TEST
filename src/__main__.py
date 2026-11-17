@@ -1,7 +1,10 @@
 # import fire
-from pathlib import Path
+import json
 import re
+from pathlib import Path
 import bm25s
+from .chunker import chunk_text, python_code_chunker
+from .models import MinimalSource
 
 EXT = {".py", ".md", ".txt"}
 
@@ -25,31 +28,82 @@ def read_corpus(root: str = "data/raw") -> list[tuple[str, str]]:
     return result
 
 
-_CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-_NON_ALNUM = re.compile(r"[^A-Za-z0-9]+")
+def build_chunks(corpus: list[tuple[str, str]],
+                 max_size: int) -> list[tuple[str, MinimalSource]]:
+    """Build text chunks with their source metadata."""
+    chunks = []
+
+    for file_path, content in corpus:
+        if Path(file_path).suffix == ".py":
+            spans = python_code_chunker(content, max_size)
+        else:
+            spans = chunk_text(content, max_size)
+
+        for start, end in spans:
+            source = MinimalSource(
+                file_path=file_path,
+                first_character_index=start,
+                last_character_index=end
+            )
+            chunks.append((content[start:end], source))
+
+    return chunks
 
 
 def tokenize(text: str) -> list[str]:
-    """Split text into lowercase tokens, breaking snake_case and camelCase."""
-    tokens: list[str] = []
-    for word in _NON_ALNUM.split(text):
-        if not word:
-            continue
-        parts = _CAMEL.sub(" ", word).split()
-        tokens.extend(p.lower() for p in parts)
-    return tokens
+    """Split text into lowercase tokens."""
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    text = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", text)
 
-chunks = [
-    "def max_chunk_size(): return 2000",
-    "How to configure the OpenAI server in vLLM",
-    "LoRA adapters can be loaded at runtime",
-]
+    words = re.split(r"[^A-Za-z0-9]+", text)
+
+    return [word.lower() for word in words if word]
+
+
+def search(query, retriever, chunks, valid_indices, k=10):
+    query_tokens = tokenize(query)
+
+    results, scores = retriever.retrieve([query_tokens], k=k)
+
+    sources = []
+    for idx in results[0]:
+        original_idx = valid_indices[idx]
+        text, source = chunks[original_idx]
+        sources.append(source)
+
+    return sources
 
 
 if __name__ == "__main__":
-    corpus_tokens = [tokenize(c) for c in chunks]
+    corpus = read_corpus()
+    chunks = build_chunks(corpus, max_size=2000)
+    tokenized_chunks = [
+        tokenize(text)
+        for text, source in chunks
+    ]
+    valid_indices = [
+        i for i, tokens in enumerate(tokenized_chunks) if tokens
+    ]
+    documents = [tokenized_chunks[i] for i in valid_indices]
     retriever = bm25s.BM25()
-    retriever.index(corpus_tokens)
-    query_tokens = tokenize("configure openai server")
-    results, scores = retriever.retrieve([query_tokens], k=2)
-    print(results, scores)
+    retriever.index(documents)
+    retriever.save("data/processed/bm25_index")
+    retriever = bm25s.BM25.load("data/processed/bm25_index")
+    with open("data+moulinette/datasets_public/public/AnsweredQuestions/dataset_code_public.json") as f:
+        dataset = json.load(f)
+    search_results = []
+    for item in dataset["rag_questions"]:
+        sources = search(item["question"], retriever, chunks, valid_indices)
+        search_results.append({
+            "question_id": item["question_id"],
+            "question": item["question"],
+            "retrieved_sources": [
+                source.model_dump() for source in sources
+            ]
+        })
+    output = {
+        "search_results": search_results,
+        "k": 10
+    }
+    with open("data/processed/code_public_results.json", "w") as f:
+        json.dump(output, f, indent=4)

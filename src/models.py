@@ -1,4 +1,4 @@
-from Pydanctic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MinimalSource(BaseModel):
