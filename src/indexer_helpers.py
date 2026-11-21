@@ -1,9 +1,11 @@
 import re
+from tqdm import tqdm
 from pathlib import Path
 from .chunker import chunk_text, python_code_chunker
 from .models import MinimalSource
 
 EXT = {".py", ".md", ".txt"}
+
 
 def read_corpus(root: str = "data/raw") -> list[tuple[str, str]]:
     """Return (relative_path, text) pairs for every indexable file under root.
@@ -33,7 +35,7 @@ def build_chunks(corpus: list[tuple[str, str]],
     chunks = []
     if max_size <= 0:
         raise ValueError("max_chunk_size must be greater than zero")
-    for file_path, content in corpus:
+    for file_path, content in tqdm(corpus, desc="Chunking", unit="file"):
         if Path(file_path).suffix == ".py":
             spans = python_code_chunker(content, max_size)
         else:

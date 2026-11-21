@@ -5,15 +5,13 @@ PY_LANGUAGE = Language(tspython.language())
 
 
 def chunk_text(text: str, max_size: int) -> list[tuple[int, int]]:
-    
     """Split text into consecutive (start, end) spans, cutting at line ends.
        text[start:end] is the chunk
     """
     if max_size <= 0:
         raise ValueError("max_size must be greater than 0")
-
     chunks: list[tuple[int, int]] = []
-    chunk_start = 0 
+    chunk_start = 0
     pos = 0
     for line in text.splitlines(keepends=True):
         if len(line) > max_size:
@@ -33,7 +31,6 @@ def chunk_text(text: str, max_size: int) -> list[tuple[int, int]]:
     if pos > chunk_start:
         chunks.append((chunk_start, pos))
     return chunks
-
 
 
 def python_code_chunker(text: str, max_size: int) -> list[tuple[int, int]]:
