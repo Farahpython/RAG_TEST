@@ -64,7 +64,7 @@ def search(query: str, k: int = 10) -> list[MinimalSource]:
         return []
     if k < 0:
         print("k cannot be less than zero!!")
-        return
+        return []
     retriever = bm25s.BM25.load("data/processed/bm25_index")
     with open("data/processed/valid_indices.json") as f:
         valid_indices = json.load(f)
@@ -210,7 +210,7 @@ def evaluate(
         for item in student_data.search_results
     }
     for k in [1, 3, 5, 10]:
-        total_recall = 0
+        total_recall = 0.0
         count = 0
         for question in ground_truth.rag_questions:
             if not isinstance(question, AnsweredQuestion):
