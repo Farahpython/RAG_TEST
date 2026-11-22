@@ -15,6 +15,10 @@ dependencies = [
     "tree-sitter>=0.26.1",
     "llm-sdk",
     "tree-sitter-python>=0.25.0",
+    "markdown-it-py>=4.3.0",
+    "langchain-text-splitters>=1.1.3",
+    "sentence-transformers>=6.3.0",
+    "nltk>=3.10.4",
 ]
 
 [project.scripts]

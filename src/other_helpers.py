@@ -1,4 +1,5 @@
 from .models import MinimalSource
+from typing import Any
 
 
 def get_chunk_text(source: MinimalSource) -> str:
@@ -9,7 +10,7 @@ def get_chunk_text(source: MinimalSource) -> str:
     ]
 
 
-def is_match(source1: MinimalSource, source2: MinimalSource) -> bool:
+def is_match(source1: MinimalSource, source2: MinimalSource) -> Any:
     if source1.file_path != source2.file_path:
         return False
     intersection = max(
