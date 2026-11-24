@@ -3,3 +3,7 @@ moulinette
 datasets_private.zip
 evaluations
 exams
+
+# Python cache files
+__pycache__/
+*.py[cod]
