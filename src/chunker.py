@@ -50,41 +50,52 @@ def python_code_chunker(text: str, max_size: int) -> list[tuple[int, int]]:
     current_start = None
     current_end = None
 
-    def flush() -> None:
+    def flush():
         nonlocal current_start, current_end
+
         if current_start is not None:
             chunks.append((
                 byte_to_char(current_start),
                 byte_to_char(current_end)
             ))
+
         current_start = None
         current_end = None
+
     for node in tree.root_node.named_children:
         node_start = node.start_byte
         node_end = node.end_byte
+
         start_char = byte_to_char(node_start)
         end_char = byte_to_char(node_end)
+
+        # Handle structures larger than max_size.
         if end_char - start_char > max_size:
             flush()
-            if node.text is None:
-                continue
+
             node_text = node.text.decode("utf-8")
+
             for start, end in chunk_text(node_text, max_size):
                 chunks.append((
                     start_char + start,
                     start_char + end
                 ))
             continue
+
         if current_start is None:
             current_start = node_start
             current_end = node_end
             continue
+
         candidate_size = byte_to_char(node_end) - byte_to_char(current_start)
+
         if candidate_size > max_size:
             flush()
             current_start = node_start
             current_end = node_end
         else:
             current_end = node_end
+
     flush()
+
     return chunks
