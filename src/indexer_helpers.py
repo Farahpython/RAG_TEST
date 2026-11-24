@@ -1,7 +1,7 @@
 import re
 from tqdm import tqdm
 from pathlib import Path
-from .chunker import semantic_chunker, python_code_chunker
+from .chunker import chunk_text, markdown_only_chunk_text, python_code_chunker
 from .models import MinimalSource
 
 EXT = {".py", ".md", ".txt"}
@@ -38,9 +38,10 @@ def build_chunks(corpus: list[tuple[str, str]],
     for file_path, content in tqdm(corpus, desc="Chunking", unit="file"):
         if Path(file_path).suffix == ".py":
             spans = python_code_chunker(content, max_size)
+        elif Path(file_path).suffix == ".md":
+            spans = markdown_only_chunk_text(content, max_size, overlap=600)
         else:
-            spans = semantic_chunker(content, max_size)
-
+            spans = chunk_text(content, max_size)
         for start, end in spans:
             source = MinimalSource(
                 file_path=file_path,
@@ -48,7 +49,6 @@ def build_chunks(corpus: list[tuple[str, str]],
                 last_character_index=end
             )
             chunks.append((content[start:end], source))
-
     return chunks
 
 
@@ -56,7 +56,5 @@ def tokenize(text: str) -> list[str]:
     """Split text into lowercase tokens."""
     text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
     text = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", text)
-
     words = re.split(r"[^A-Za-z0-9]+", text)
-
     return [word.lower() for word in words if word]

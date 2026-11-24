@@ -2,10 +2,8 @@ import fire
 import json
 import bm25s
 import uuid
-# import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-# from typing import List
 from llm_sdk import Small_LLM_Model
 from .indexer_helpers import read_corpus, build_chunks, tokenize
 from .other_helpers import get_chunk_text, is_match

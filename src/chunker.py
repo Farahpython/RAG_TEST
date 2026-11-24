@@ -1,125 +1,69 @@
+import re
 import tree_sitter_python as tspython
-from markdown_it import MarkdownIt
 from tree_sitter import Language, Parser
-from nltk.tokenize import sent_tokenize
-from sentence_transformers import SentenceTransformer, util
-from nltk.tokenize import PunktTokenizer
 
 PY_LANGUAGE = Language(tspython.language())
-EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
-TOKENIZER = PunktTokenizer("english")
 
+
+def markdown_only_chunk_text(text, max_size, overlap=300):
+    if max_size <= 0:
+        raise ValueError("max_size must be positive")
+    if overlap < 0 or overlap >= max_size:
+        raise ValueError("overlap must be between 0 and max_size")
+    heading_pattern = re.compile(
+        r"^#{1,6}[ \t]+.+$",
+        re.MULTILINE
+    )
+    headings = list(heading_pattern.finditer(text))
+    if not headings:
+        sections = [(0, len(text))]
+    else:
+        sections = []
+        if headings[0].start() > 0:
+            sections.append((0, headings[0].start()))
+        for i, heading in enumerate(headings):
+            start = heading.start()
+            if i + 1 < len(headings):
+                end = headings[i + 1].start()
+            else:
+                end = len(text)
+            sections.append((start, end))
+    chunks = []
+    for section_start, section_end in sections:
+        start = section_start
+        while start < section_end:
+            end = min(start + max_size, section_end)
+            chunks.append((start, end))
+            if end == section_end:
+                break
+            start = end - overlap
+    return chunks
 
 
 def chunk_text(text: str, max_size: int) -> list[tuple[int, int]]:
     """Split text into consecutive character spans."""
-
     if max_size <= 0:
         raise ValueError("max_size must be greater than 0")
-
     chunks = []
     chunk_start = 0
     pos = 0
-
     for line in text.splitlines(keepends=True):
         if len(line) > max_size:
             if pos > chunk_start:
                 chunks.append((chunk_start, pos))
-
             line_end = pos + len(line)
-
             while pos < line_end:
                 end = min(pos + max_size, line_end)
                 chunks.append((pos, end))
                 pos = end
-
             chunk_start = pos
             continue
-
         if pos + len(line) - chunk_start > max_size:
             chunks.append((chunk_start, pos))
             chunk_start = pos
-
         pos += len(line)
-
     if pos > chunk_start:
         chunks.append((chunk_start, pos))
-
-    return chunks
-
-
-def semantic_chunker(
-    text: str,
-    max_size: int,
-    similarity_threshold: float = 0.3,
-) -> list[tuple[int, int]]:
-    """Split text into semantically related sentence spans."""
-
-    if max_size <= 0:
-        raise ValueError("max_size must be greater than 0")
-
-    sentence_positions = list(TOKENIZER.span_tokenize(text))
-
-    if not sentence_positions:
-        return []
-
-    sentences = [
-        text[start:end]
-        for start, end in sentence_positions
-    ]
-
-    embeddings = EMBEDDING_MODEL.encode(
-        sentences,
-        convert_to_tensor=True,
-    )
-
-    chunks = []
-    chunk_start = None
-    current_end = None
-
-    for i, (start, end) in enumerate(sentence_positions):
-
-        # Handle a sentence that exceeds the maximum size.
-        if end - start > max_size:
-            if chunk_start is not None:
-                chunks.append((chunk_start, current_end))
-
-            for sub_start, sub_end in chunk_text(
-                text[start:end], max_size
-            ):
-                chunks.append((
-                    start + sub_start,
-                    start + sub_end,
-                ))
-
-            chunk_start = None
-            current_end = None
-            continue
-
-        if chunk_start is None:
-            chunk_start = start
-            current_end = end
-            continue
-
-        similarity = util.cos_sim(
-            embeddings[i - 1],
-            embeddings[i],
-        ).item()
-
-        candidate_size = end - chunk_start
-
-        if (
-            similarity < similarity_threshold
-            or candidate_size > max_size
-        ):
-            chunks.append((chunk_start, current_end))
-            chunk_start = start
-
-        current_end = end
-
-    if chunk_start is not None:
-        chunks.append((chunk_start, current_end))
-
     return chunks
 
 
@@ -127,11 +71,9 @@ def python_code_chunker(text: str, max_size: int) -> list[tuple[int, int]]:
     """Split Python source into structure-aware character spans."""
     if max_size <= 0:
         raise ValueError("max_size must be greater than 0")
-
     parser = Parser(PY_LANGUAGE)
     source_bytes = text.encode("utf-8")
     tree = parser.parse(source_bytes)
-
     chunks: list[tuple[int, int]] = []
 
     def byte_to_char(offset: int) -> int:
@@ -178,24 +120,3 @@ def python_code_chunker(text: str, max_size: int) -> list[tuple[int, int]]:
             current_end = node_end
     flush()
     return chunks
-
-
-if __name__ == "__main__":
-    text = (
-        "Python is a programming language. "
-        "It is widely used for data science and machine learning. "
-        "The weather is sunny today. "
-        "The temperature is around 25 degrees."
-    )
-
-    spans = semantic_chunker(
-        text,
-        max_size=200,
-        similarity_threshold=0.3,
-    )
-
-    for start, end in spans:
-        print("--- CHUNK ---")
-        print(repr(text[start:end]))
-        print("Length:", end - start)
-        print("Offsets:", start, end)
