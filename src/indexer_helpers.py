@@ -1,7 +1,7 @@
 import re
 from tqdm import tqdm
 from pathlib import Path
-from .chunker import chunk_text, markdown_only_chunk_text, python_code_chunker
+from .chunker import chunk_text, markdown_chunker, python_code_chunker
 from .models import MinimalSource
 
 EXT = {".py", ".md", ".txt"}
@@ -39,7 +39,7 @@ def build_chunks(corpus: list[tuple[str, str]],
         if Path(file_path).suffix == ".py":
             spans = python_code_chunker(content, max_size)
         elif Path(file_path).suffix == ".md":
-            spans = markdown_only_chunk_text(content, max_size, overlap=600)
+            spans = markdown_chunker(content, max_size, overlap=600)
         else:
             spans = chunk_text(content, max_size)
         for start, end in spans:
