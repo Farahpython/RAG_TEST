@@ -56,5 +56,4 @@ def tokenize(text: str) -> list[str]:
     """Split text into lowercase tokens."""
     text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
     text = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", text)
-    words = re.split(r"[^A-Za-z0-9]+", text)
-    return [word.lower() for word in words if word]
+    return re.findall(r"[A-Za-z0-9]+", text.lower())

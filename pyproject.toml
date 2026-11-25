@@ -16,6 +16,7 @@ dependencies = [
     "llm-sdk",
     "tree-sitter-python>=0.25.0",
     "langchain-openai>=1.8.5",
+    "langchain-text-splitters>=1.2.0",
 ]
 
 [project.scripts]
