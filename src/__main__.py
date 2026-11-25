@@ -89,6 +89,9 @@ def search_dataset(
     save_directory: str = "data/output/search_results"
 ) -> None:
     """Retrieve sources for every question in a dataset."""
+    if not Path(dataset_path).is_file():
+        print(f"Dataset file not found: {dataset_path}")
+        return
     with open(dataset_path) as f:
         dataset = RagDataset.model_validate_json(f.read())
     search_results = []
@@ -117,10 +120,13 @@ model = Small_LLM_Model()
 def answer(query: str, k: int = 5) -> MinimalAnswer:
     """Generate an answer using retrieved context."""
     retrieved_sources = search(query, k)
-
     if not retrieved_sources:
-        raise ValueError("No relevant sources found.")
-
+        return MinimalAnswer(
+            question_id=str(uuid.uuid4()),
+            question=query,
+            retrieved_sources=[],
+            answer="I don't know."
+        )
     context = "\n\n".join(
         get_chunk_text(source) for source in retrieved_sources
     )
