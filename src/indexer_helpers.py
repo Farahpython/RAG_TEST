@@ -9,11 +9,9 @@ EXT = {".py", ".md", ".txt"}
 
 def get_markdown_context(text: str, position: int) -> str:
     """Get the heading hierarchy surrounding a Markdown position."""
-
     code_pattern = re.compile(
         r"(?ms)^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\1[ \t]*$"
     )
-
     protected = code_pattern.sub(
         lambda m: "".join(
             "\n" if char == "\n" else " "
@@ -21,26 +19,19 @@ def get_markdown_context(text: str, position: int) -> str:
         ),
         text,
     )
-
     heading_pattern = re.compile(
         r"^(#{1,6})[ \t]+(.+?)\s*$",
         re.MULTILINE,
     )
-
-    hierarchy = []
-
+    hierarchy: list[tuple[int, str]] = []
     for match in heading_pattern.finditer(protected):
         if match.start() > position:
             break
-
         level = len(match.group(1))
         title = match.group(2).strip()
-
         while hierarchy and hierarchy[-1][0] >= level:
             hierarchy.pop()
-
         hierarchy.append((level, title))
-
     return " > ".join(title for _, title in hierarchy)
 
 
