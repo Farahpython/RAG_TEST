@@ -7,6 +7,43 @@ from .models import MinimalSource
 EXT = {".py", ".md", ".txt"}
 
 
+def get_markdown_context(text: str, position: int) -> str:
+    """Get the heading hierarchy surrounding a Markdown position."""
+
+    code_pattern = re.compile(
+        r"(?ms)^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\1[ \t]*$"
+    )
+
+    protected = code_pattern.sub(
+        lambda m: "".join(
+            "\n" if char == "\n" else " "
+            for char in m.group(0)
+        ),
+        text,
+    )
+
+    heading_pattern = re.compile(
+        r"^(#{1,6})[ \t]+(.+?)\s*$",
+        re.MULTILINE,
+    )
+
+    hierarchy = []
+
+    for match in heading_pattern.finditer(protected):
+        if match.start() > position:
+            break
+
+        level = len(match.group(1))
+        title = match.group(2).strip()
+
+        while hierarchy and hierarchy[-1][0] >= level:
+            hierarchy.pop()
+
+        hierarchy.append((level, title))
+
+    return " > ".join(title for _, title in hierarchy)
+
+
 def read_corpus(root: str = "data/raw") -> list[tuple[str, str]]:
     """Return (relative_path, text) pairs for every indexable file under root.
        Unreadable files are skipped with a warning.
@@ -27,8 +64,10 @@ def read_corpus(root: str = "data/raw") -> list[tuple[str, str]]:
     return result
 
 
-def build_chunks(corpus: list[tuple[str, str]],
-                 max_size: int) -> list[tuple[str, MinimalSource]]:
+def build_chunks(
+    corpus: list[tuple[str, str]],
+    max_size: int,
+) -> list[tuple[str, MinimalSource]]:
     """Build text chunks with their source metadata.
        Each chunk is tagged with metadata for quick filtering.
     """
@@ -48,7 +87,15 @@ def build_chunks(corpus: list[tuple[str, str]],
                 first_character_index=start,
                 last_character_index=end
             )
-            chunks.append((content[start:end], source))
+            enriched_text = content[start:end]
+            if Path(file_path).suffix == ".md":
+                context = get_markdown_context(content, start)
+                enriched_text = (
+                    f"Document: {Path(file_path).name}\n"
+                    f"Section: {context}\n\n"
+                    f"{enriched_text}"
+                )
+            chunks.append((enriched_text, source))
     return chunks
 
 

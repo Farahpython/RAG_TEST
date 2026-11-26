@@ -1,6 +1,6 @@
 from typing import Any
 from .models import MinimalSource
-
+from llm_sdk import Small_LLM_Model
 
 def get_chunk_text(source: MinimalSource) -> str:
     with open(source.file_path) as f:
